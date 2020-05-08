@@ -40,7 +40,7 @@ date
 
 ```{r}
 df <- air %>%
- select('iran_non.iran', date)
+ select(iran_non.iran, date)  # лапки дають помилку, тож без них
 df
 ```
 
@@ -54,17 +54,17 @@ date
 ### 3. Сортування
 
 ```{r}
-df <- read.csv("checkpoints/df-2.csv")
-sort(date, FALSE, TRUE')
+# df <- read.csv("checkpoints/df-2.csv")
+?arrange  # як працює сортування в tidy. Розумію вас, сама часто пишу "sort" замість "arrange"
 
+df <- df %>% arrange(date)
 df
 ```
 
 ### 4. Розрахунок нових змінних
-
+Фідбек: тут все супер
 ```{r}
 #df <- read.csv("checkpoints/df-3.csv")
-
 
 df <- mutate(df,
        year = year(date),
@@ -82,9 +82,10 @@ df %>% mutate(n())
 ```
 
 ```{r}
-df %>%
+df <- df %>%    # не забувайте присвоювати значення, бо результат роботи не буде зберігатись 
   group_by(day, month) %>%
-  mutate(n()) 
+  filter(n() == 2) %>%    # бо ми хочемо фільтрувати, а не рахувати нову колонку
+  ungroup()    # розгрупуємо, коли діло зроблено. Інакше потім df буде згрупований і можуть бути помилки через це
   
 ```
 
@@ -119,10 +120,12 @@ wider_df
 #?str_c
 
 wider_df <- wider_df %>%
-  str_c("year", "month", "day", sep = "-")
-  
+  mutate(date = str_c(2020, month, day, sep = "-"),
+         date = as.Date(date),
+         change_percent = y2020 / y2019)  # тут же можна порахувати, на скільки % змінились польоти з/до Ірану у 2020-му році порівняно з 2019
+# "day" це просто рядок, у якому написано "day", а day без лапок — то ваша змінна  
  
-df
+wider_df
 
 ```
 
@@ -163,11 +166,36 @@ covid19
 # wider_df <- read.csv("checkpoints/df-6-wider.csv") %>%
 #   mutate(date = as.Date(date))
 
-df <- covid19 %>%
- select("Iran", date)
+# filter — щоб вибрати рядки за значенням змінних, select — щоб вибрати колонки за іменем
+covid19 <- covid19 %>%
+ filter(country == "Iran")
 
-join(df, air, by = null, type = left, match = all)
+# join(df, air, by = null, type = left, match = all)
+# краще вказувати, який саме джойн, і датафрейми переплутали
+
+df_final <- covid19 %>%
+  left_join(wider_df, by = c("date"))
 ```
+
+Бонусний графік
+```{r}
+df_for_plot <- df_final %>%
+  ungroup() %>%  # чогось воно було згруповане, можу я помилилась раніше і не розгрупувала
+  select(date,
+         "Кількість активних випадків" = active_cases,  # тут же перейменуємо колонки для графіка
+         "Частка зовнішніх рейсів у порівнянні з 2019 р." = change_percent) %>%
+  pivot_longer(cols = -c(date), names_to = "what", values_to = "n")
+
+
+ggplot(df_for_plot, aes(date, n, color = what)) +
+  geom_line(show.legend = FALSE) + 
+  facet_wrap(vars(what), scales = "free_y") +
+  labs(title = "Іран. Коронавірус та авіація") + 
+  theme_minimal()
+
+# якщо ще подописувати стиль теми, буде цілком гарний графік
+```
+
 
 ### 8. Збережіть отримані з'єднані дані в csv.
 ```{r}
